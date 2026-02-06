@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'Package.swift'
+      - 'Package.resolved'
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Run tests
+        run: swift test
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp .build/release/scan artifact/scan
+          chmod +x artifact/scan
+          cd artifact && zip scan-macos.zip scan
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-macos
+          path: artifact/scan-macos.zip
+          retention-days: 90
