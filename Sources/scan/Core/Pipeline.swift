@@ -169,7 +169,7 @@ struct Pipeline: Sendable {
         )
 
         let registry = AnalyzerRegistry(logger: logger)
-        let (analyzerFindings, analyzerErrors) = await registry.runAll(
+        let (analyzerFindings, analyzerErrors) = try await registry.runAll(
             context: analysisContext,
             strict: options.strict
         )

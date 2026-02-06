@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Result of running a subprocess
 struct ShellResult: Sendable {
@@ -53,10 +54,15 @@ struct ShellRunner: Sendable {
         async let stdoutData = Task.detached { stdoutHandle.readDataToEndOfFile() }.value
         async let stderrData = Task.detached { stderrHandle.readDataToEndOfFile() }.value
 
+        // Track whether we triggered the timeout (vs process killed by other signal).
+        // OSAllocatedUnfairLock is Sendable, safe to share between Task and caller.
+        let didTimeout = OSAllocatedUnfairLock(initialState: false)
+
         // Set up timeout
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             if process.isRunning {
+                didTimeout.withLock { $0 = true }
                 process.terminate()
             }
         }
@@ -70,8 +76,8 @@ struct ShellRunner: Sendable {
         let stdout = String(data: outData, encoding: .utf8) ?? ""
         let stderr = String(data: errData, encoding: .utf8) ?? ""
 
-        // Check if process was terminated due to timeout
-        if process.terminationReason == .uncaughtSignal {
+        // Only throw timeout if we actually triggered termination
+        if didTimeout.withLock({ $0 }) {
             throw ScanError.subprocessTimeout(
                 command: "\(executable) \(arguments.joined(separator: " "))",
                 timeout: timeout

@@ -22,12 +22,18 @@ struct AnalyzerRegistry: Sendable {
         ]
     }
 
+    /// Internal init for testing with custom analyzer list
+    init(analyzers: [any Analyzer], logger: VerboseLogger) {
+        self.analyzers = analyzers
+        self.logger = logger
+    }
+
     /// Run all applicable analyzers against the given context
     /// - Parameters:
     ///   - context: Analysis context with file info and options
-    ///   - strict: If true, stop on first analyzer error
+    ///   - strict: If true, throw on first analyzer error
     /// - Returns: Tuple of findings and errors
-    func runAll(context: AnalysisContext, strict: Bool) async -> ([Finding], [ScanErrorRecord]) {
+    func runAll(context: AnalysisContext, strict: Bool) async throws -> ([Finding], [ScanErrorRecord]) {
         let applicable = analyzers.filter { $0.canAnalyze(context) }
         for a in analyzers where !applicable.contains(where: { $0.name == a.name }) {
             logger.debug("Skipping \(a.name): not applicable")
@@ -66,11 +72,19 @@ struct AnalyzerRegistry: Sendable {
                 allFindings.append(contentsOf: findings)
                 logger.debug("\(analyzer.name): \(findings.count) findings")
             case .failure(let error):
+                let description = (error as? ScanError)?.description ?? String(describing: error)
                 allErrors.append(ScanErrorRecord(
                     step: "analyzer:\(analyzer.name)",
-                    message: error.localizedDescription
+                    message: description
                 ))
                 logger.error("Analyzer '\(analyzer.name)' failed: \(error)")
+
+                if strict {
+                    throw ScanError.analyzerFailed(
+                        name: analyzer.name,
+                        reason: description
+                    )
+                }
             }
         }
 

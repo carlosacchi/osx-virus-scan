@@ -44,6 +44,10 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
             )
         }
 
+        // Security: check compression ratio (zip bomb detection)
+        let ratioFindings = checkCompressionRatio(source: source, extractionDir: extractDir)
+        findings.append(contentsOf: ratioFindings)
+
         // Security: validate no path escapes (Zip Slip protection)
         let escapeFindings = try validateNoEscape(extractionDir: extractDir)
         findings.append(contentsOf: escapeFindings)
@@ -62,6 +66,53 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
     }
 
     // MARK: - Security validation
+
+    /// Compare compressed vs decompressed size to detect zip bombs
+    private func checkCompressionRatio(source: URL, extractionDir: URL) -> [Finding] {
+        var findings: [Finding] = []
+        guard let compressedAttrs = try? FileManager.default.attributesOfItem(atPath: source.path),
+              let compressedSize = compressedAttrs[.size] as? UInt64,
+              compressedSize > 0 else {
+            return findings
+        }
+
+        let extractedSize = Self.directorySize(url: extractionDir)
+        let ratio = Double(extractedSize) / Double(compressedSize)
+
+        if ratio > Self.maxCompressionRatio {
+            logger.info("Compression ratio: \(String(format: "%.1f", ratio)):1 (threshold: \(String(format: "%.0f", Self.maxCompressionRatio)):1)")
+            findings.append(Finding(
+                id: "zip_bomb_ratio",
+                category: .packaging,
+                severity: .high,
+                confidence: .medium,
+                summary: "Suspicious compression ratio (\(String(format: "%.0f", ratio)):1)",
+                evidence: "Compressed: \(compressedSize) bytes, Extracted: \(extractedSize) bytes, Ratio: \(String(format: "%.1f", ratio)):1 exceeds \(String(format: "%.0f", Self.maxCompressionRatio)):1 threshold",
+                location: source.lastPathComponent,
+                remediation: "Inspect the archive manually — high compression ratios may indicate a zip bomb"
+            ))
+        }
+
+        return findings
+    }
+
+    /// Recursively sum file sizes in a directory
+    private static func directorySize(url: URL) -> UInt64 {
+        guard let enumerator = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return 0 }
+
+        var total: UInt64 = 0
+        while let fileURL = enumerator.nextObject() as? URL {
+            guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+                  values.isRegularFile == true,
+                  let size = values.fileSize else { continue }
+            total += UInt64(size)
+        }
+        return total
+    }
 
     /// Path-boundary-aware containment check (prevents edge cases like /tmp/foo matching /tmp/foobar)
     private func isContained(_ resolvedPath: String, within basePath: String) -> Bool {

@@ -1,4 +1,5 @@
 import ArgumentParser
+import CryptoKit
 import Foundation
 
 struct UpdateCommand: AsyncParsableCommand {
@@ -79,9 +80,12 @@ struct UpdateCommand: AsyncParsableCommand {
         }
     }
 
-    private static let yaraRuleSources: [(name: String, url: String)] = [
-        ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar"),
-        ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar"),
+    /// YARA rule sources with pinned SHA-256 for integrity verification.
+    /// To update a rule: download the new file, compute its SHA-256, and update the hash here.
+    /// Set sha256 to nil to skip verification (not recommended for production).
+    private static let yaraRuleSources: [(name: String, url: String, sha256: String?)] = [
+        ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar", nil),
+        ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar", nil),
     ]
 
     private func updateYARA(shell: ShellRunner, logger: VerboseLogger) async {
@@ -106,6 +110,18 @@ struct UpdateCommand: AsyncParsableCommand {
                     print("    Failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
                     continue
                 }
+
+                // Verify integrity if a pinned hash is available
+                if let expectedHash = source.sha256 {
+                    let actualHash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                    if actualHash != expectedHash {
+                        print("    Integrity check FAILED — expected \(expectedHash.prefix(16))..., got \(actualHash.prefix(16))...")
+                        print("    Skipping \(source.name) (possible tampering or upstream change)")
+                        continue
+                    }
+                    print("    SHA-256 verified")
+                }
+
                 try data.write(to: destFile)
                 downloaded += 1
             } catch {
