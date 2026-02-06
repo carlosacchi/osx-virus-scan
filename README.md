@@ -75,6 +75,18 @@ scan --debug ~/Downloads/suspicious.app
 
 Scan a single file. This is the default subcommand.
 
+### `scan setup`
+
+Install optional dependencies (ClamAV + YARA) via Homebrew and initialize databases. One command to get everything ready:
+
+```bash
+scan setup             # Install ClamAV + YARA + download virus definitions
+scan setup --clamav    # Install ClamAV only
+scan setup --yara      # Install YARA only
+```
+
+Requires [Homebrew](https://brew.sh). Already-installed tools are skipped.
+
 ### `scan update`
 
 Update optional detection databases.
