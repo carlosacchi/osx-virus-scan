@@ -39,7 +39,51 @@ struct AnalyzerRegistry: Sendable {
             logger.debug("Skipping \(a.name): not applicable")
         }
 
-        // Run analyzers in parallel using structured concurrency
+        // Run analyzers in parallel using structured concurrency.
+        // In strict mode, use withThrowingTaskGroup so the first error cancels remaining tasks.
+        if strict {
+            return try await runStrict(applicable: applicable, context: context)
+        } else {
+            return await runBestEffort(applicable: applicable, context: context)
+        }
+    }
+
+    /// Strict mode: throw (and cancel remaining analyzers) on first error
+    private func runStrict(
+        applicable: [any Analyzer], context: AnalysisContext
+    ) async throws -> ([Finding], [ScanErrorRecord]) {
+        let results = try await withThrowingTaskGroup(
+            of: (String, [Finding]).self,
+            returning: [(String, [Finding])].self
+        ) { group in
+            for analyzer in applicable {
+                group.addTask {
+                    let findings = try await analyzer.analyze(context)
+                    return (analyzer.name, findings)
+                }
+            }
+            var collected: [(String, [Finding])] = []
+            for try await result in group {
+                collected.append(result)
+            }
+            return collected
+        }
+
+        // Reassemble in original order for deterministic output
+        var allFindings: [Finding] = []
+        for analyzer in applicable {
+            if let (_, findings) = results.first(where: { $0.0 == analyzer.name }) {
+                allFindings.append(contentsOf: findings)
+                logger.debug("\(analyzer.name): \(findings.count) findings")
+            }
+        }
+        return (allFindings, [])
+    }
+
+    /// Non-strict mode: collect all results, record errors without throwing
+    private func runBestEffort(
+        applicable: [any Analyzer], context: AnalysisContext
+    ) async -> ([Finding], [ScanErrorRecord]) {
         let results = await withTaskGroup(
             of: (String, Result<[Finding], Error>).self,
             returning: [(String, Result<[Finding], Error>)].self
@@ -78,13 +122,6 @@ struct AnalyzerRegistry: Sendable {
                     message: description
                 ))
                 logger.error("Analyzer '\(analyzer.name)' failed: \(error)")
-
-                if strict {
-                    throw ScanError.analyzerFailed(
-                        name: analyzer.name,
-                        reason: description
-                    )
-                }
             }
         }
 

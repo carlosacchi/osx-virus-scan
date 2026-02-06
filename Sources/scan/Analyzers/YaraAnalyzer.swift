@@ -71,6 +71,7 @@ struct YaraAnalyzer: Analyzer, Sendable {
         }
 
         // Run yara with each rule file
+        var ruleErrors = 0
         for ruleFile in ruleFiles {
             let result = try await shell.run(
                 executable: yaraPath,
@@ -78,37 +79,58 @@ struct YaraAnalyzer: Analyzer, Sendable {
                 timeout: 120
             )
 
-            if result.exitCode == 0 && !result.stdout.isEmpty {
-                // Parse YARA matches
-                let lines = result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }
-                for line in lines {
-                    // Format: RuleName /path/to/matched/file
-                    let parts = line.components(separatedBy: " ")
-                    let ruleName = parts.first ?? "unknown"
-                    let matchedFile = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
+            if result.exitCode == 0 {
+                if !result.stdout.isEmpty {
+                    // Parse YARA matches
+                    let lines = result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }
+                    for line in lines {
+                        // Format: RuleName /path/to/matched/file
+                        let parts = line.components(separatedBy: " ")
+                        let ruleName = parts.first ?? "unknown"
+                        let matchedFile = parts.count > 1 ? parts.dropFirst().joined(separator: " ") : ""
 
-                    findings.append(Finding(
-                        id: "yara_match_\(ruleName.lowercased())",
-                        category: .yara,
-                        severity: .high,
-                        confidence: .medium,
-                        summary: "YARA rule match: \(ruleName)",
-                        evidence: "Rule '\(ruleName)' matched in \(matchedFile)",
-                        location: matchedFile,
-                        remediation: "Review the YARA rule and the matched file for potential threats."
-                    ))
+                        findings.append(Finding(
+                            id: "yara_match_\(ruleName.lowercased())",
+                            category: .yara,
+                            severity: .high,
+                            confidence: .medium,
+                            summary: "YARA rule match: \(ruleName)",
+                            evidence: "Rule '\(ruleName)' matched in \(matchedFile)",
+                            location: matchedFile,
+                            remediation: "Review the YARA rule and the matched file for potential threats."
+                        ))
+                    }
                 }
+            } else {
+                // Non-zero exit: rule compilation error, file access error, etc.
+                ruleErrors += 1
+                let errDetail = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                context.logger.error("YARA error with \(ruleFile.lastPathComponent) (exit \(result.exitCode)): \(errDetail)")
+                findings.append(Finding(
+                    id: "yara_error",
+                    category: .yara,
+                    severity: .medium,
+                    confidence: .high,
+                    summary: "YARA scan error with \(ruleFile.lastPathComponent)",
+                    evidence: "Exit code \(result.exitCode): \(errDetail)",
+                    location: ruleFile.lastPathComponent,
+                    remediation: "Check the rule file for syntax errors or recompile with 'yara -C'."
+                ))
             }
         }
 
-        if findings.isEmpty || findings.allSatisfy({ $0.id == "yara_no_rules" || $0.id == "yara_not_installed" }) {
+        // Only emit "clean" if at least some rules ran successfully without matches
+        let matchFindings = findings.filter { $0.id.hasPrefix("yara_match_") }
+        let errorFindings = findings.filter { $0.id == "yara_error" }
+        if matchFindings.isEmpty && errorFindings.count < ruleFiles.count {
+            let successCount = ruleFiles.count - ruleErrors
             findings.append(Finding(
                 id: "yara_clean",
                 category: .yara,
                 severity: .info,
                 confidence: .medium,
                 summary: "YARA: no rule matches",
-                evidence: "Scanned with \(ruleFiles.count) rule file(s), no matches",
+                evidence: "Scanned with \(successCount)/\(ruleFiles.count) rule file(s) successfully, no matches",
                 location: nil,
                 remediation: nil
             ))

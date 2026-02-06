@@ -17,10 +17,24 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
         self.logger = logger
     }
 
+    /// Maximum total extracted size in bytes (2 GB) to prevent disk exhaustion
+    private static let maxExtractedSize: UInt64 = 2 * 1024 * 1024 * 1024
+
     func unpack(source: URL, into destination: URL) async throws -> UnpackResult {
         var findings: [Finding] = []
 
         logger.info("Extracting ZIP: \(source.lastPathComponent)")
+
+        // Pre-extraction check: use zipinfo to get declared uncompressed size
+        let preCheckFindings = try await preExtractionSizeCheck(source: source)
+        findings.append(contentsOf: preCheckFindings)
+        if preCheckFindings.contains(where: { $0.severity == .high }) {
+            // Abort extraction for likely zip bombs
+            return UnpackResult(
+                contentRoot: destination,
+                findings: findings
+            )
+        }
 
         let extractDir = destination.appendingPathComponent("zip-extract")
         try FileManager.default.createDirectory(at: extractDir, withIntermediateDirectories: true)
@@ -66,6 +80,70 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
     }
 
     // MARK: - Security validation
+
+    /// Pre-extraction check: parse zipinfo to get declared uncompressed size before extracting
+    private func preExtractionSizeCheck(source: URL) async throws -> [Finding] {
+        var findings: [Finding] = []
+
+        guard let compressedAttrs = try? FileManager.default.attributesOfItem(atPath: source.path),
+              let compressedSize = compressedAttrs[.size] as? UInt64,
+              compressedSize > 0 else {
+            return findings
+        }
+
+        // zipinfo -t prints a summary line like "123 files, 456789 bytes uncompressed, ..."
+        let result = try await shell.run(
+            executable: "/usr/bin/zipinfo",
+            arguments: ["-t", source.path],
+            timeout: 10
+        )
+
+        guard result.succeeded else { return findings }
+
+        // Parse declared uncompressed size from summary line
+        let line = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let declaredSize = parseDeclaredSize(from: line) {
+            let ratio = Double(declaredSize) / Double(compressedSize)
+
+            if declaredSize > Self.maxExtractedSize || ratio > Self.maxCompressionRatio {
+                logger.info("Pre-extraction bomb check: declared \(declaredSize) bytes, ratio \(String(format: "%.0f", ratio)):1")
+                findings.append(Finding(
+                    id: "zip_bomb_precheck",
+                    category: .packaging,
+                    severity: .high,
+                    confidence: .medium,
+                    summary: "Likely zip bomb detected (declared \(Self.formatBytes(declaredSize)), ratio \(String(format: "%.0f", ratio)):1)",
+                    evidence: "Compressed: \(compressedSize) bytes, Declared uncompressed: \(declaredSize) bytes. Exceeds safety threshold — extraction aborted.",
+                    location: source.lastPathComponent,
+                    remediation: "Do not extract this archive. It may exhaust disk space."
+                ))
+            }
+        }
+
+        return findings
+    }
+
+    /// Parse the declared uncompressed byte count from zipinfo -t output
+    /// Example: "1 file, 12345 bytes uncompressed, 123 bytes compressed:  99.0%"
+    private func parseDeclaredSize(from line: String) -> UInt64? {
+        // Look for the pattern: "<number> bytes uncompressed"
+        let parts = line.components(separatedBy: ",")
+        for part in parts {
+            let trimmed = part.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasSuffix("bytes uncompressed") {
+                let numStr = trimmed.replacingOccurrences(of: "bytes uncompressed", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                return UInt64(numStr)
+            }
+        }
+        return nil
+    }
+
+    private static func formatBytes(_ bytes: UInt64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(clamping: bytes))
+    }
 
     /// Compare compressed vs decompressed size to detect zip bombs
     private func checkCompressionRatio(source: URL, extractionDir: URL) -> [Finding] {

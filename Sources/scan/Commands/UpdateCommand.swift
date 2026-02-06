@@ -84,8 +84,10 @@ struct UpdateCommand: AsyncParsableCommand {
     /// To update a rule: download the new file, compute its SHA-256, and update the hash here.
     /// Set sha256 to nil to skip verification (not recommended for production).
     private static let yaraRuleSources: [(name: String, url: String, sha256: String?)] = [
-        ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar", nil),
-        ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar", nil),
+        ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar",
+         "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"),
+        ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar",
+         "1ba3175cebe28fc5d4d25c1caf604beda152766db268a3f159e4bf61c2eddf54"),
     ]
 
     private func updateYARA(shell: ShellRunner, logger: VerboseLogger) async {

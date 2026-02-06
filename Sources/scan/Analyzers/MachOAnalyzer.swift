@@ -46,7 +46,7 @@ struct MachOAnalyzer: Analyzer, Sendable {
             return findings
         }
 
-        let magic = data.prefix(4).withUnsafeBytes { $0.load(as: UInt32.self) }
+        let magic = data.prefix(4).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }
 
         var archInfo = ""
         switch magic {
@@ -68,7 +68,7 @@ struct MachOAnalyzer: Analyzer, Sendable {
             archInfo = "Universal Mach-O (FAT)"
             if data.count >= 8 {
                 let archCount = data.subdata(in: 4..<8).withUnsafeBytes {
-                    UInt32(bigEndian: $0.load(as: UInt32.self))
+                    UInt32(bigEndian: $0.loadUnaligned(as: UInt32.self))
                 }
                 archInfo += " (\(archCount) architectures)"
             }

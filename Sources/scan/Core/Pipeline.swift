@@ -139,8 +139,7 @@ struct Pipeline: Sendable {
                 errors.append(ScanErrorRecord(step: "unpack", message: errMsg))
 
                 if options.strict {
-                    await unpacker?.cleanup()
-                    if !options.noCleanup { td.cleanup() }
+                    await performCleanup(unpacker: unpacker, tempDir: tempDir)
                     throw error
                 }
             } catch {
@@ -148,8 +147,7 @@ struct Pipeline: Sendable {
                 logger.error(errMsg)
                 errors.append(ScanErrorRecord(step: "unpack", message: errMsg))
                 if options.strict {
-                    await unpacker?.cleanup()
-                    if !options.noCleanup { td.cleanup() }
+                    await performCleanup(unpacker: unpacker, tempDir: tempDir)
                     throw ScanError.unpackFailed(type: fileType, reason: error.localizedDescription)
                 }
             }
@@ -169,12 +167,18 @@ struct Pipeline: Sendable {
         )
 
         let registry = AnalyzerRegistry(logger: logger)
-        let (analyzerFindings, analyzerErrors) = try await registry.runAll(
-            context: analysisContext,
-            strict: options.strict
-        )
-        findings.append(contentsOf: analyzerFindings)
-        errors.append(contentsOf: analyzerErrors)
+        do {
+            let (analyzerFindings, analyzerErrors) = try await registry.runAll(
+                context: analysisContext,
+                strict: options.strict
+            )
+            findings.append(contentsOf: analyzerFindings)
+            errors.append(contentsOf: analyzerErrors)
+        } catch {
+            // Strict mode threw — cleanup containers before propagating
+            await performCleanup(unpacker: unpacker, tempDir: tempDir)
+            throw error
+        }
 
         // 7. Score
         logger.debug("Phase: scoring")
@@ -183,13 +187,8 @@ struct Pipeline: Sendable {
 
         logger.info("Verdict: \(verdict.rawValue), Score: \(score)")
 
-        // 8. Cleanup (await to ensure DMG unmount / temp deletion completes before exit)
-        if let up = unpacker {
-            await up.cleanup()
-        }
-        if !options.noCleanup, let td = tempDir {
-            td.cleanup()
-        }
+        // 8. Cleanup
+        await performCleanup(unpacker: unpacker, tempDir: tempDir)
 
         // 9. Build result
         let elapsed = Date().timeIntervalSince(startTime)
@@ -207,6 +206,16 @@ struct Pipeline: Sendable {
             errors: errors,
             scanDuration: elapsed
         )
+    }
+
+    /// Cleanup unpacker and temp directory (safe to call multiple times)
+    private func performCleanup(unpacker: (any Unpacker)?, tempDir: TempDirectory?) async {
+        if let up = unpacker {
+            await up.cleanup()
+        }
+        if !options.noCleanup, let td = tempDir {
+            td.cleanup()
+        }
     }
 
     /// Create the appropriate unpacker for a file type
