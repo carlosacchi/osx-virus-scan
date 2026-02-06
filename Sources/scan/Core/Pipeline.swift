@@ -4,6 +4,13 @@ import Foundation
 struct Pipeline: Sendable {
     let options: ScanOptions
     let logger: VerboseLogger
+    let progress: ProgressReporter
+
+    init(options: ScanOptions, logger: VerboseLogger) {
+        self.options = options
+        self.logger = logger
+        self.progress = ProgressReporter(enabled: !options.json)
+    }
 
     func run(path: String) async throws -> ScanResult {
         let startTime = Date()
@@ -11,6 +18,9 @@ struct Pipeline: Sendable {
         var errors: [ScanErrorRecord] = []
 
         logger.info("Starting scan of: \(path)")
+
+        // Show banner
+        progress.banner()
 
         // 1. Ingest: validate path, resolve symlinks, get basic attributes
         logger.debug("Phase: ingest")
@@ -34,8 +44,19 @@ struct Pipeline: Sendable {
 
         logger.info("Detected type: \(fileType.displayName)")
 
+        // Show scan target
+        let sizeFormatter = ByteCountFormatter()
+        sizeFormatter.countStyle = .file
+        let sizeStr = sizeFormatter.string(fromByteCount: Int64(ingestResult.size))
+        progress.scanTarget(
+            name: ingestResult.resolvedURL.lastPathComponent,
+            size: sizeStr,
+            type: fileType.displayName
+        )
+
         // 2. Compute SHA-256 hash (streaming)
         logger.debug("Phase: hash")
+        progress.step("Hashing file (\(sizeStr))...")
         var sha256 = ""
         if !ingestResult.isDirectory {
             do {
@@ -80,6 +101,15 @@ struct Pipeline: Sendable {
 
         if fileType.isContainer {
             logger.debug("Phase: unpack")
+            let unpackLabel: String
+            switch fileType {
+            case .dmg: unpackLabel = "Mounting DMG..."
+            case .zip: unpackLabel = "Extracting ZIP..."
+            case .pkg: unpackLabel = "Expanding PKG..."
+            default: unpackLabel = "Unpacking..."
+            }
+            progress.step(unpackLabel)
+
             let td = try TempDirectory()
             tempDir = td
 
@@ -95,6 +125,7 @@ struct Pipeline: Sendable {
 
                 // Generate manifest
                 logger.debug("Phase: manifest")
+                progress.step("Generating manifest...")
                 let manifestGen = ManifestGenerator(logger: logger)
                 manifest = try manifestGen.generate(rootURL: unpackResult.contentRoot)
 
@@ -133,6 +164,7 @@ struct Pipeline: Sendable {
 
         // 6. Run analyzers
         logger.debug("Phase: analyze")
+        progress.step("Running analyzers...")
 
         // Track the content root for containers (where the DMG mount point or extraction dir may be)
         var contentRoot: URL?
@@ -178,6 +210,7 @@ struct Pipeline: Sendable {
 
         // 8. Build result
         let elapsed = Date().timeIntervalSince(startTime)
+        progress.done(duration: elapsed)
 
         return ScanResult(
             tool: .current,
