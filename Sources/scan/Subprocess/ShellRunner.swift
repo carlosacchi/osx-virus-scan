@@ -16,11 +16,13 @@ struct ShellRunner: Sendable {
     /// - Parameters:
     ///   - executable: Full path to the executable (e.g., "/usr/bin/hdiutil")
     ///   - arguments: Command arguments
+    ///   - stdinData: Optional data to write to the process's stdin (prevents hanging on interactive prompts)
     ///   - timeout: Maximum execution time in seconds (default 60)
     /// - Returns: ShellResult with exit code, stdout, and stderr
     func run(
         executable: String,
         arguments: [String],
+        stdinData: Data? = nil,
         timeout: TimeInterval = 60
     ) async throws -> ShellResult {
         let process = Process()
@@ -32,7 +34,16 @@ struct ShellRunner: Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        try process.run()
+        if let stdinData {
+            let stdinPipe = Pipe()
+            process.standardInput = stdinPipe
+            try process.run()
+            stdinPipe.fileHandleForWriting.write(stdinData)
+            stdinPipe.fileHandleForWriting.closeFile()
+        } else {
+            process.standardInput = FileHandle.nullDevice
+            try process.run()
+        }
 
         // Set up timeout
         let timeoutTask = Task {

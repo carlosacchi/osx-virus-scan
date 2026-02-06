@@ -92,6 +92,7 @@ final class DMGMounter: Unpacker, @unchecked Sendable {
                 try await Task.sleep(for: .seconds(2))
             }
 
+            // Pipe "Y\n" to stdin to auto-accept EULA if the DMG has one
             let result = try await shell.run(
                 executable: "/usr/bin/hdiutil",
                 arguments: [
@@ -104,6 +105,7 @@ final class DMGMounter: Unpacker, @unchecked Sendable {
                     "-noautoopen",
                     "-mountrandom", mountDir.path
                 ],
+                stdinData: "Y\n".data(using: .utf8),
                 timeout: 120
             )
 
