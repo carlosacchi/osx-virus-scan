@@ -63,6 +63,12 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
 
     // MARK: - Security validation
 
+    /// Path-boundary-aware containment check (prevents edge cases like /tmp/foo matching /tmp/foobar)
+    private func isContained(_ resolvedPath: String, within basePath: String) -> Bool {
+        let baseWithSlash = basePath.hasSuffix("/") ? basePath : basePath + "/"
+        return resolvedPath == basePath || resolvedPath.hasPrefix(baseWithSlash)
+    }
+
     /// Walk all extracted files and verify none escape the extraction directory
     private func validateNoEscape(extractionDir: URL) throws -> [Finding] {
         var findings: [Finding] = []
@@ -101,9 +107,8 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
             // Check symlinks
             let resourceValues = try? fileURL.resourceValues(forKeys: [.isSymbolicLinkKey])
             if resourceValues?.isSymbolicLink == true {
-                // Resolve the symlink and check if it escapes
                 let resolved = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
-                if !resolved.hasPrefix(basePath) {
+                if !isContained(resolved, within: basePath) {
                     findings.append(Finding(
                         id: "zip_symlink_escape",
                         category: .packaging,
@@ -122,7 +127,7 @@ final class ZIPExtractor: Unpacker, @unchecked Sendable {
 
             // Check for path traversal in filenames
             let resolved = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
-            if !resolved.hasPrefix(basePath) {
+            if !isContained(resolved, within: basePath) {
                 throw ScanError.zipSlipDetected(
                     path: fileURL.path,
                     resolved: resolved

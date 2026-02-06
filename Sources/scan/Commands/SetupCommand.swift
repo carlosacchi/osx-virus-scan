@@ -88,8 +88,11 @@ struct SetupCommand: AsyncParsableCommand {
             if !FileManager.default.fileExists(atPath: conf),
                FileManager.default.fileExists(atPath: sample) {
                 do {
-                    var contents = try String(contentsOfFile: sample, encoding: .utf8)
-                    contents = contents.replacingOccurrences(of: "Example", with: "# Example")
+                    var lines = try String(contentsOfFile: sample, encoding: .utf8)
+                        .components(separatedBy: "\n")
+                    // Comment out only standalone "Example" directives, not substrings
+                    lines = lines.map { $0.trimmingCharacters(in: .whitespaces) == "Example" ? "# Example" : $0 }
+                    let contents = lines.joined(separator: "\n")
                     try contents.write(toFile: conf, atomically: true, encoding: .utf8)
                     print("  Created freshclam.conf")
                 } catch {

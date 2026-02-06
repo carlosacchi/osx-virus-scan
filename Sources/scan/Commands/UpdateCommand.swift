@@ -79,6 +79,11 @@ struct UpdateCommand: AsyncParsableCommand {
         }
     }
 
+    private static let yaraRuleSources: [(name: String, url: String)] = [
+        ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar"),
+        ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar"),
+    ]
+
     private func updateYARA(shell: ShellRunner, logger: VerboseLogger) async {
         let rulesDir = ScanConfig.yaraRulesDir
 
@@ -89,20 +94,35 @@ struct UpdateCommand: AsyncParsableCommand {
             return
         }
 
-        // Count existing rules
+        // Download bundled rule sources
+        var downloaded = 0
+        for source in Self.yaraRuleSources {
+            let destFile = rulesDir.appendingPathComponent("\(source.name).yar")
+            print("  Downloading \(source.name)...")
+            do {
+                let url = URL(string: source.url)!
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    print("    Failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0))")
+                    continue
+                }
+                try data.write(to: destFile)
+                downloaded += 1
+            } catch {
+                print("    Error: \(error.localizedDescription)")
+            }
+        }
+        print("  Downloaded \(downloaded) rule file(s).")
+
+        // Count total rules
         let existingRules = (try? FileManager.default.contentsOfDirectory(
             at: rulesDir, includingPropertiesForKeys: nil
         ))?.filter { $0.pathExtension == "yar" || $0.pathExtension == "yara" } ?? []
 
-        print("  Rules directory: \(rulesDir.path)")
-        print("  Existing rules: \(existingRules.count) file(s)")
-        print("  Custom rules directory: \(ScanConfig.yaraCustomRulesDir.path)")
+        print("  Rules directory: \(rulesDir.path) (\(existingRules.count) file(s))")
+        print("  Custom rules: \(ScanConfig.yaraCustomRulesDir.path)")
         print("")
-        print("  To add rules manually:")
-        print("    - Place .yar/.yara files in: \(rulesDir.path)")
-        print("    - Or for custom rules: \(ScanConfig.yaraCustomRulesDir.path)")
-        print("")
-        print("  Recommended rule sources:")
+        print("  Additional rule sources:")
         print("    - https://github.com/Yara-Rules/rules")
         print("    - https://github.com/elastic/protections-artifacts")
         print("    - https://github.com/reversinglabs/reversinglabs-yara-rules")

@@ -3,16 +3,17 @@ import Foundation
 /// Reports scan progress to stderr so the user knows what's happening
 final class ProgressReporter: @unchecked Sendable {
     private let enabled: Bool
+    private let useColor: Bool
     private let stderr = FileHandle.standardError
 
-    private let dim = "\u{001B}[2m"
-    private let bold = "\u{001B}[1m"
-    private let cyan = "\u{001B}[36m"
-    private let green = "\u{001B}[32m"
-    private let reset = "\u{001B}[0m"
+    private var dim: String { useColor ? "\u{001B}[2m" : "" }
+    private var bold: String { useColor ? "\u{001B}[1m" : "" }
+    private var green: String { useColor ? "\u{001B}[32m" : "" }
+    private var reset: String { useColor ? "\u{001B}[0m" : "" }
 
     init(enabled: Bool) {
         self.enabled = enabled
+        self.useColor = isatty(STDERR_FILENO) != 0
     }
 
     func banner() {

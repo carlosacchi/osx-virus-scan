@@ -5,8 +5,8 @@ struct ReputationAnalyzer: Analyzer, Sendable {
     let name = "reputation"
 
     func canAnalyze(_ context: AnalysisContext) -> Bool {
-        // Only run when --reputation flag is set
-        return context.options.reputation && !context.metadata.sha256.isEmpty
+        // Only run when --reputation flag is set and not in offline mode
+        return context.options.reputation && !context.options.offline && !context.metadata.sha256.isEmpty
     }
 
     func analyze(_ context: AnalysisContext) async throws -> [Finding] {

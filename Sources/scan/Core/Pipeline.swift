@@ -98,6 +98,7 @@ struct Pipeline: Sendable {
         var manifest: Manifest?
         var unpacker: (any Unpacker)?
         var tempDir: TempDirectory?
+        var contentRoot: URL?
 
         if fileType.isContainer {
             logger.debug("Phase: unpack")
@@ -122,6 +123,9 @@ struct Pipeline: Sendable {
                     into: td.url
                 )
                 findings.append(contentsOf: unpackResult.findings)
+
+                // Use the same content root for both manifest and analyzers
+                contentRoot = unpackResult.contentRoot
 
                 // Generate manifest
                 logger.debug("Phase: manifest")
@@ -151,38 +155,9 @@ struct Pipeline: Sendable {
             }
         }
 
-        // Deferred cleanup
-        defer {
-            if let up = unpacker, let td = tempDir {
-                let noCleanup = options.noCleanup
-                Task {
-                    await up.cleanup()
-                    if !noCleanup { td.cleanup() }
-                }
-            }
-        }
-
         // 6. Run analyzers
         logger.debug("Phase: analyze")
         progress.step("Running analyzers...")
-
-        // Track the content root for containers (where the DMG mount point or extraction dir may be)
-        var contentRoot: URL?
-        if fileType.isContainer, let td = tempDir {
-            // The content root is the first subdirectory in the temp dir
-            if let contents = try? FileManager.default.contentsOfDirectory(
-                at: td.url, includingPropertiesForKeys: nil
-            ) {
-                // Find the mount/extract directory
-                for item in contents {
-                    var isDir: ObjCBool = false
-                    if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
-                        contentRoot = item
-                        break
-                    }
-                }
-            }
-        }
 
         let analysisContext = AnalysisContext(
             metadata: metadata,
@@ -208,7 +183,15 @@ struct Pipeline: Sendable {
 
         logger.info("Verdict: \(verdict.rawValue), Score: \(score)")
 
-        // 8. Build result
+        // 8. Cleanup (await to ensure DMG unmount / temp deletion completes before exit)
+        if let up = unpacker {
+            await up.cleanup()
+        }
+        if !options.noCleanup, let td = tempDir {
+            td.cleanup()
+        }
+
+        // 9. Build result
         let elapsed = Date().timeIntervalSince(startTime)
         progress.done(duration: elapsed)
 

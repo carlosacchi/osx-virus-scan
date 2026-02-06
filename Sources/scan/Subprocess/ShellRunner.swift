@@ -45,6 +45,14 @@ struct ShellRunner: Sendable {
             try process.run()
         }
 
+        // Read pipe data concurrently to avoid deadlock when output fills pipe buffers.
+        // Must read BEFORE waitUntilExit(), otherwise large output blocks the child process.
+        let stdoutHandle = stdoutPipe.fileHandleForReading
+        let stderrHandle = stderrPipe.fileHandleForReading
+
+        async let stdoutData = Task.detached { stdoutHandle.readDataToEndOfFile() }.value
+        async let stderrData = Task.detached { stderrHandle.readDataToEndOfFile() }.value
+
         // Set up timeout
         let timeoutTask = Task {
             try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
@@ -53,14 +61,14 @@ struct ShellRunner: Sendable {
             }
         }
 
+        // Collect pipe data and wait for process
+        let outData = await stdoutData
+        let errData = await stderrData
         process.waitUntilExit()
         timeoutTask.cancel()
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+        let stdout = String(data: outData, encoding: .utf8) ?? ""
+        let stderr = String(data: errData, encoding: .utf8) ?? ""
 
         // Check if process was terminated due to timeout
         if process.terminationReason == .uncaughtSignal {

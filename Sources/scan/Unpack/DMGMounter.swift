@@ -6,7 +6,20 @@ final class DMGMounter: Unpacker, @unchecked Sendable {
 
     private let shell = ShellRunner()
     private let logger: VerboseLogger
-    private var mountPoints: [String] = []
+    private let lock = NSLock()
+    private var _mountPoints: [String] = []
+
+    private var mountPoints: [String] {
+        get { lock.withLock { _mountPoints } }
+    }
+
+    private func appendMountPoint(_ mp: String) {
+        lock.withLock { _mountPoints.append(mp) }
+    }
+
+    private func clearMountPoints() {
+        lock.withLock { _mountPoints.removeAll() }
+    }
 
     init(logger: VerboseLogger) {
         self.logger = logger
@@ -32,7 +45,7 @@ final class DMGMounter: Unpacker, @unchecked Sendable {
         }
 
         let mountPoint = try parseMountPoint(from: plistData)
-        mountPoints.append(mountPoint)
+        appendMountPoint(mountPoint)
 
         logger.info("DMG mounted at: \(mountPoint)")
 
@@ -50,8 +63,9 @@ final class DMGMounter: Unpacker, @unchecked Sendable {
                 remediation: "Inspect each volume manually"
             ))
             // Track all mount points for cleanup
-            for mp in allMountPoints where !mountPoints.contains(mp) {
-                mountPoints.append(mp)
+            let existing = mountPoints
+            for mp in allMountPoints where !existing.contains(mp) {
+                appendMountPoint(mp)
             }
         }
 
@@ -77,7 +91,7 @@ final class DMGMounter: Unpacker, @unchecked Sendable {
                 logger.error("Error unmounting \(mountPoint): \(error)")
             }
         }
-        mountPoints.removeAll()
+        clearMountPoints()
     }
 
     // MARK: - Mount helpers

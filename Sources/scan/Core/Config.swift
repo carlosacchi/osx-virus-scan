@@ -6,16 +6,9 @@ struct ScanConfig: Codable, Sendable {
     var virusTotalAPIKey: String?
     /// YARA rules sources (URLs to download rules from)
     var yaraRuleSources: [String]
-    /// Whether ClamAV integration is enabled
-    var clamavEnabled: Bool
-    /// Whether YARA integration is enabled
-    var yaraEnabled: Bool
-
     static let `default` = ScanConfig(
         virusTotalAPIKey: nil,
-        yaraRuleSources: [],
-        clamavEnabled: true,
-        yaraEnabled: true
+        yaraRuleSources: []
     )
 
     /// Configuration directory path
@@ -44,15 +37,6 @@ struct ScanConfig: Codable, Sendable {
         configDir.appendingPathComponent("clamav")
     }
 
-    /// Load config from disk, or return defaults
-    static func load() -> ScanConfig {
-        guard let data = try? Data(contentsOf: configFile),
-              let config = try? JSONDecoder().decode(ScanConfig.self, from: data) else {
-            return .default
-        }
-        return config
-    }
-
     /// Save config to disk
     func save() throws {
         try FileManager.default.createDirectory(
@@ -63,6 +47,11 @@ struct ScanConfig: Codable, Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
         try data.write(to: ScanConfig.configFile)
+        // Restrict permissions to owner-only (may contain API keys)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: ScanConfig.configFile.path
+        )
     }
 
     /// Ensure all required directories exist

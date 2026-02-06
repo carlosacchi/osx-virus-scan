@@ -21,13 +21,13 @@ curl -LO https://github.com/carlosacchi/osx-virus-scan/releases/latest/download/
 unzip scan-macos.zip
 
 # Remove macOS quarantine attribute and make executable
-xattr -cr scan && chmod +x scan
+xattr -c scan && chmod +x scan
 
 # Move to PATH
 mv scan /usr/local/bin/scan
 ```
 
-> **Note:** macOS blocks unsigned binaries downloaded from the internet. The `xattr -cr` command removes the quarantine flag so the binary can run without Gatekeeper blocking it.
+> **Note:** macOS blocks unsigned binaries downloaded from the internet. The `xattr -c` command removes the quarantine flag from the `scan` binary so it can run without Gatekeeper blocking it.
 
 ### Build from source
 

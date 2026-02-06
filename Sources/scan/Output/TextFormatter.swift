@@ -99,10 +99,13 @@ struct TextFormatter: OutputFormatter, Sendable {
         return lines.joined(separator: "\n")
     }
 
-    // ANSI color codes
-    private var resetColor: String { "\u{001B}[0m" }
+    // ANSI color codes — disabled when stdout is not a TTY (e.g., piped to file)
+    private static let isTTY = isatty(STDOUT_FILENO) != 0
+
+    private var resetColor: String { Self.isTTY ? "\u{001B}[0m" : "" }
 
     private func colorForVerdict(_ verdict: Verdict) -> String {
+        guard Self.isTTY else { return "" }
         switch verdict {
         case .info: return "\u{001B}[36m"    // cyan
         case .low: return "\u{001B}[32m"     // green

@@ -28,32 +28,49 @@ struct AnalyzerRegistry: Sendable {
     ///   - strict: If true, stop on first analyzer error
     /// - Returns: Tuple of findings and errors
     func runAll(context: AnalysisContext, strict: Bool) async -> ([Finding], [ScanErrorRecord]) {
+        let applicable = analyzers.filter { $0.canAnalyze(context) }
+        for a in analyzers where !applicable.contains(where: { $0.name == a.name }) {
+            logger.debug("Skipping \(a.name): not applicable")
+        }
+
+        // Run analyzers in parallel using structured concurrency
+        let results = await withTaskGroup(
+            of: (String, Result<[Finding], Error>).self,
+            returning: [(String, Result<[Finding], Error>)].self
+        ) { group in
+            for analyzer in applicable {
+                group.addTask {
+                    do {
+                        let findings = try await analyzer.analyze(context)
+                        return (analyzer.name, .success(findings))
+                    } catch {
+                        return (analyzer.name, .failure(error))
+                    }
+                }
+            }
+            var collected: [(String, Result<[Finding], Error>)] = []
+            for await result in group {
+                collected.append(result)
+            }
+            return collected
+        }
+
+        // Reassemble in original order for deterministic output
         var allFindings: [Finding] = []
         var allErrors: [ScanErrorRecord] = []
 
-        for analyzer in analyzers {
-            guard analyzer.canAnalyze(context) else {
-                logger.debug("Skipping \(analyzer.name): not applicable")
-                continue
-            }
-
-            logger.info("Running analyzer: \(analyzer.name)")
-
-            do {
-                let findings = try await analyzer.analyze(context)
+        for analyzer in applicable {
+            guard let (_, result) = results.first(where: { $0.0 == analyzer.name }) else { continue }
+            switch result {
+            case .success(let findings):
                 allFindings.append(contentsOf: findings)
                 logger.debug("\(analyzer.name): \(findings.count) findings")
-            } catch {
-                let errRecord = ScanErrorRecord(
+            case .failure(let error):
+                allErrors.append(ScanErrorRecord(
                     step: "analyzer:\(analyzer.name)",
                     message: error.localizedDescription
-                )
-                allErrors.append(errRecord)
+                ))
                 logger.error("Analyzer '\(analyzer.name)' failed: \(error)")
-
-                if strict {
-                    break
-                }
             }
         }
 
