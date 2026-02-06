@@ -11,11 +11,30 @@ A static file analyzer CLI for macOS. Pre-flight safety check for downloaded fil
 
 ## Install
 
+### Download (prebuilt binary)
+
+Grab the latest release from the [Releases page](https://github.com/carlosacchi/osx-virus-scan/releases):
+
+```bash
+# Download the latest release
+curl -LO https://github.com/carlosacchi/osx-virus-scan/releases/latest/download/scan-macos.zip
+unzip scan-macos.zip
+
+# Remove macOS quarantine attribute and make executable
+xattr -cr scan && chmod +x scan
+
+# Move to PATH
+mv scan /usr/local/bin/scan
+```
+
+> **Note:** macOS blocks unsigned binaries downloaded from the internet. The `xattr -cr` command removes the quarantine flag so the binary can run without Gatekeeper blocking it.
+
+### Build from source
+
 ```bash
 git clone https://github.com/carlosacchi/osx-virus-scan.git
 cd osx-virus-scan
 swift build -c release
-# Binary is at .build/release/scan
 cp .build/release/scan /usr/local/bin/scan
 ```
 
