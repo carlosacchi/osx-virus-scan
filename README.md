@@ -16,14 +16,9 @@ A static file analyzer CLI for macOS. Pre-flight safety check for downloaded fil
 Grab the latest release from the [Releases page](https://github.com/carlosacchi/osx-virus-scan/releases):
 
 ```bash
-# Download the latest release
 curl -LO https://github.com/carlosacchi/osx-virus-scan/releases/latest/download/scan-macos.zip
 unzip scan-macos.zip
-
-# Remove macOS quarantine attribute and make executable
 xattr -c scan && chmod +x scan
-
-# Move to PATH
 mv scan /usr/local/bin/scan
 ```
 
