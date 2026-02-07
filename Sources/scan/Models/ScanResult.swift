@@ -5,7 +5,7 @@ struct ToolInfo: Codable, Sendable {
     let name: String
     let version: String
 
-    static let current = ToolInfo(name: "scan", version: "0.9.1")
+    static let current = ToolInfo(name: "scan", version: "0.9.2")
 }
 
 /// Top-level scan result containing all findings and metadata
@@ -30,6 +30,8 @@ struct ScanResult: Codable, Sendable {
     let errors: [ScanErrorRecord]
     /// Scan duration in seconds
     let scanDuration: Double
+    /// Analysis coverage information
+    let coverage: AnalysisCoverage
 }
 
 /// Information about the scan input

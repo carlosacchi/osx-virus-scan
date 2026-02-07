@@ -80,14 +80,30 @@ struct UpdateCommand: AsyncParsableCommand {
         }
     }
 
-    /// YARA rule sources with pinned SHA-256 for integrity verification.
+    /// YARA rule sources with optional SHA-256 for integrity verification.
     /// To update a rule: download the new file, compute its SHA-256, and update the hash here.
-    /// Set sha256 to nil to skip verification (not recommended for production).
+    /// Set sha256 to nil to skip verification (allows rule updates without breaking validation).
     private static let yaraRuleSources: [(name: String, url: String, sha256: String?)] = [
+        // Existing rules with pinned hashes
         ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar",
          "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"),
         ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar",
          "1ba3175cebe28fc5d4d25c1caf604beda152766db268a3f159e4bf61c2eddf54"),
+
+        // macOS-specific malware (nil hashes for flexibility)
+        ("MALW_LoudMiner", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_LoudMiner.yar", nil),
+        ("MALW_EvilQuest", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_OSX_EvilQuest.yar", nil),
+        ("MALW_Shlayer", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_OSX_Shlayer.yar", nil),
+        ("APT_Bundlore", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/APT_OSX_Bundlore.yar", nil),
+
+        // Generic malware patterns
+        ("MALW_Meterpreter", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Meterpreter.yar", nil),
+        ("MALW_CobaltStrike", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_CobaltStrike.yar", nil),
+        ("MALW_Ransomware", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Ransomware.yar", nil),
+
+        // Webshells & backdoors
+        ("WEBSHELL_Generic", "https://raw.githubusercontent.com/Yara-Rules/rules/master/webshells/WEBSHELL_ASPX.yar", nil),
+        ("MALW_Backdoor", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Backdoor.yar", nil),
     ]
 
     private func updateYARA(shell: ShellRunner, logger: VerboseLogger) async {

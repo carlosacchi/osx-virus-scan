@@ -23,7 +23,10 @@ struct CodeSignAnalyzer: Analyzer, Sendable {
                 $0.isExecutable || $0.type == .machO || $0.type == .app
             }
 
-            for entry in executableEntries.prefix(20) { // Limit to avoid excessive checks
+            let limit = context.options.maxExecutableChecks
+            let entriesToAnalyze = limit.map { executableEntries.prefix($0) } ?? executableEntries[...]
+
+            for entry in entriesToAnalyze {
                 let entryURL = contentRoot.appendingPathComponent(entry.relativePath)
                 let entryFindings = analyzeViaAPI(url: entryURL)
                 // Tag findings with location
@@ -39,6 +42,20 @@ struct CodeSignAnalyzer: Analyzer, Sendable {
                         remediation: finding.remediation
                     ))
                 }
+            }
+
+            // Warn if analysis was truncated
+            if let limit = context.options.maxExecutableChecks, executableEntries.count > limit {
+                findings.append(Finding(
+                    id: "codesign_truncated",
+                    category: .metadata,
+                    severity: .medium,
+                    confidence: .high,
+                    summary: "Code signing analysis truncated",
+                    evidence: "Only analyzed \(limit) of \(executableEntries.count) executables",
+                    location: nil,
+                    remediation: "Use --max-executable-checks 0 to analyze all executables."
+                ))
             }
         }
 

@@ -37,6 +37,16 @@ struct ScanConfig: Codable, Sendable {
         configDir.appendingPathComponent("clamav")
     }
 
+    /// Load config from disk (or return default if not found)
+    static func load() throws -> ScanConfig {
+        guard FileManager.default.fileExists(atPath: configFile.path) else {
+            return .default
+        }
+        let data = try Data(contentsOf: configFile)
+        let decoder = JSONDecoder()
+        return try decoder.decode(ScanConfig.self, from: data)
+    }
+
     /// Save config to disk
     func save() throws {
         try FileManager.default.createDirectory(

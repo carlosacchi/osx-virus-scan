@@ -28,6 +28,16 @@ struct AnalyzerRegistry: Sendable {
         self.logger = logger
     }
 
+    /// Get number of registered analyzers
+    var analyzerCount: Int {
+        return analyzers.count
+    }
+
+    /// Get list of applicable analyzers for given context
+    func getApplicableAnalyzers(context: AnalysisContext) -> [any Analyzer] {
+        return analyzers.filter { $0.canAnalyze(context) }
+    }
+
     /// Run all applicable analyzers against the given context
     /// - Parameters:
     ///   - context: Analysis context with file info and options

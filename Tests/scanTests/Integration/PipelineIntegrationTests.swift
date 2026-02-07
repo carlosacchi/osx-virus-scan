@@ -117,7 +117,8 @@ struct PipelineIntegrationTests {
     func strictMode() async {
         let strictOptions = ScanOptions(
             json: false, verbose: false, debug: false,
-            strict: true, offline: true, reputation: false, noCleanup: false
+            strict: true, offline: true, reputation: false, noCleanup: false,
+            maxExecutableChecks: nil
         )
         let pipeline = Pipeline(options: strictOptions, logger: logger)
 

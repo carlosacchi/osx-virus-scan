@@ -187,10 +187,22 @@ struct Pipeline: Sendable {
 
         logger.info("Verdict: \(verdict.rawValue), Score: \(score)")
 
-        // 8. Cleanup
+        // 8. Compute coverage
+        let applicable = registry.getApplicableAnalyzers(context: analysisContext)
+        let coverage = AnalysisCoverage(
+            totalAnalyzers: registry.analyzerCount,
+            applicableAnalyzers: applicable.count,
+            analyzersRun: applicable.map { $0.name },
+            findingsBySeverity: Dictionary(grouping: findings, by: { $0.severity.rawValue })
+                .mapValues { $0.count },
+            categoriesCovered: Array(Set(findings.map { $0.category.rawValue })),
+            executionTime: Date().timeIntervalSince(startTime)
+        )
+
+        // 9. Cleanup
         await performCleanup(unpacker: unpacker, tempDir: tempDir)
 
-        // 9. Build result
+        // 10. Build result
         let elapsed = Date().timeIntervalSince(startTime)
         progress.done(duration: elapsed)
 
@@ -204,7 +216,8 @@ struct Pipeline: Sendable {
             manifest: manifest,
             findings: findings,
             errors: errors,
-            scanDuration: elapsed
+            scanDuration: elapsed,
+            coverage: coverage
         )
     }
 

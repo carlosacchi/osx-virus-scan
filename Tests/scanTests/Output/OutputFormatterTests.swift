@@ -35,7 +35,15 @@ struct OutputFormatterTests {
             )
         ],
         errors: [],
-        scanDuration: 0.5
+        scanDuration: 0.5,
+        coverage: AnalysisCoverage(
+            totalAnalyzers: 8,
+            applicableAnalyzers: 4,
+            analyzersRun: ["codesign", "gatekeeper"],
+            findingsBySeverity: ["medium": 1],
+            categoriesCovered: ["signature"],
+            executionTime: 0.5
+        )
     )
 
     @Test("Text formatter includes key fields")
@@ -73,7 +81,8 @@ struct OutputFormatterTests {
             manifest: nil,
             findings: sampleResult.findings,
             errors: sampleResult.errors,
-            scanDuration: sampleResult.scanDuration
+            scanDuration: sampleResult.scanDuration,
+            coverage: sampleResult.coverage
         )
 
         let formatter = TextFormatter()
@@ -132,7 +141,15 @@ struct OutputFormatterTests {
             manifest: manifest,
             findings: [],
             errors: [],
-            scanDuration: 0.1
+            scanDuration: 0.1,
+            coverage: AnalysisCoverage(
+                totalAnalyzers: 8,
+                applicableAnalyzers: 3,
+                analyzersRun: ["codesign"],
+                findingsBySeverity: [:],
+                categoriesCovered: [],
+                executionTime: 0.1
+            )
         )
 
         let formatter = TextFormatter()
@@ -154,7 +171,15 @@ struct OutputFormatterTests {
             manifest: nil,
             findings: [],
             errors: [ScanErrorRecord(step: "hash", message: "Permission denied")],
-            scanDuration: 0.1
+            scanDuration: 0.1,
+            coverage: AnalysisCoverage(
+                totalAnalyzers: 8,
+                applicableAnalyzers: 0,
+                analyzersRun: [],
+                findingsBySeverity: [:],
+                categoriesCovered: [],
+                executionTime: 0.1
+            )
         )
 
         let formatter = TextFormatter()

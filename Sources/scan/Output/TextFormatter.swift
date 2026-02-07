@@ -96,6 +96,20 @@ struct TextFormatter: OutputFormatter, Sendable {
             }
         }
 
+        // Coverage Summary
+        lines.append("")
+        lines.append("Coverage:")
+        lines.append("  Analyzers:  \(result.coverage.applicableAnalyzers)/\(result.coverage.totalAnalyzers) applicable (\(result.coverage.analyzersRun.joined(separator: ", ")))")
+        lines.append("  Categories: \(result.coverage.categoriesCovered.joined(separator: ", "))")
+
+        let severities = ["high", "medium", "low", "info"]
+        let severityCounts = severities.compactMap { sev in
+            guard let count = result.coverage.findingsBySeverity[sev], count > 0 else { return nil }
+            return "\(count) \(sev.capitalized)"
+        }.joined(separator: ", ")
+        lines.append("  Findings:   \(severityCounts.isEmpty ? "none" : severityCounts)")
+        lines.append("  Duration:   \(String(format: "%.1f", result.coverage.executionTime))s")
+
         return lines.joined(separator: "\n")
     }
 

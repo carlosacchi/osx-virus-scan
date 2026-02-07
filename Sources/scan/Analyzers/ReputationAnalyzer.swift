@@ -18,6 +18,15 @@ struct ReputationAnalyzer: Analyzer, Sendable {
         let bazaarFindings = try await queryMalwareBazaar(sha256: sha256, logger: context.logger)
         findings.append(contentsOf: bazaarFindings)
 
+        // Query VirusTotal if API key available
+        if let config = try? ScanConfig.load(),
+           let apiKey = config.virusTotalAPIKey,
+           !apiKey.isEmpty {
+            if let vtFinding = await queryVirusTotal(sha256: sha256, apiKey: apiKey, logger: context.logger) {
+                findings.append(vtFinding)
+            }
+        }
+
         return findings
     }
 
@@ -125,4 +134,102 @@ struct ReputationAnalyzer: Analyzer, Sendable {
 
         return findings
     }
+
+    // MARK: - VirusTotal API
+
+    /// Query VirusTotal for hash reputation
+    private func queryVirusTotal(sha256: String, apiKey: String, logger: VerboseLogger) async -> Finding? {
+        let urlString = "https://www.virustotal.com/api/v3/files/\(sha256)"
+        guard let url = URL(string: urlString) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.setValue("x-apikey \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+
+        logger.info("Querying VirusTotal for SHA-256: \(sha256)")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return nil }
+
+            // Handle rate limiting
+            if httpResponse.statusCode == 429 {
+                return Finding(
+                    id: "reputation_vt_rate_limited",
+                    category: .reputation,
+                    severity: .info,
+                    confidence: .low,
+                    summary: "VirusTotal rate limit exceeded",
+                    evidence: "HTTP 429",
+                    location: nil,
+                    remediation: "Wait before retrying or upgrade API tier."
+                )
+            }
+
+            // Hash not found
+            if httpResponse.statusCode == 404 {
+                return Finding(
+                    id: "reputation_vt_clean",
+                    category: .reputation,
+                    severity: .info,
+                    confidence: .medium,
+                    summary: "Not found in VirusTotal",
+                    evidence: "Hash not in VT database",
+                    location: nil,
+                    remediation: nil
+                )
+            }
+
+            guard httpResponse.statusCode == 200 else { return nil }
+
+            // Parse JSON response
+            let json = try JSONDecoder().decode(VTResponse.self, from: data)
+            let malicious = json.data.attributes.last_analysis_stats.malicious
+            let total = json.data.attributes.last_analysis_stats.total
+
+            if malicious > 0 {
+                return Finding(
+                    id: "reputation_virustotal",
+                    category: .reputation,
+                    severity: .high,
+                    confidence: .high,
+                    summary: "Detected by \(malicious)/\(total) VirusTotal engines",
+                    evidence: "Malicious detections: \(malicious), Total scans: \(total)",
+                    location: nil,
+                    remediation: "File is flagged as malware by multiple AV engines."
+                )
+            } else {
+                return Finding(
+                    id: "reputation_vt_clean",
+                    category: .reputation,
+                    severity: .info,
+                    confidence: .high,
+                    summary: "Clean in VirusTotal (0/\(total))",
+                    evidence: "No detections",
+                    location: nil,
+                    remediation: nil
+                )
+            }
+        } catch {
+            logger.error("VirusTotal query failed: \(error)")
+            return nil
+        }
+    }
+}
+
+// MARK: - VirusTotal Response Models
+
+private struct VTResponse: Codable {
+    struct Data: Codable {
+        struct Attributes: Codable {
+            struct Stats: Codable {
+                let malicious: Int
+                let total: Int
+            }
+            let last_analysis_stats: Stats
+        }
+        let attributes: Attributes
+    }
+    let data: Data
 }

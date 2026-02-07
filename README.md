@@ -61,8 +61,10 @@ scan --debug ~/Downloads/suspicious.app
 | `--debug` | off | Enable debug logging (implies verbose) |
 | `--strict` | off | Fail immediately if any analyzer errors |
 | `--offline` / `--no-offline` | on | Force offline mode (no network calls) |
-| `--reputation` | off | Enable hash reputation lookup via MalwareBazaar (requires network) |
+| `--reputation` | off | Enable hash reputation lookup via MalwareBazaar + VirusTotal (requires network) |
 | `--cleanup` / `--no-cleanup` | on | Cleanup temporary files after scan |
+| `--max-executable-checks` | 0 (unlimited) | Maximum executables to analyze in containers |
+| `--hardened` | off | Enable hardened security checks (strict + reputation + verbose + no-offline) |
 
 ## Subcommands
 
@@ -94,6 +96,16 @@ scan update --yara     # Update YARA rules only
 
 Requires `brew install clamav` and/or `brew install yara`.
 
+### `scan config`
+
+Configure scan settings (e.g., API keys).
+
+```bash
+scan config virustotal-key YOUR_API_KEY
+```
+
+Configuration is stored in `~/.config/scan/config.json` with restrictive permissions (0600).
+
 ## Supported File Types
 
 | Type | Detection | What happens |
@@ -117,7 +129,7 @@ Requires `brew install clamav` and/or `brew install yara`.
 | **Script** | Malicious patterns in scripts (network, privilege escalation, obfuscation, etc.) |
 | **ClamAV** | Optional virus scan via `clamscan` (requires `brew install clamav`) |
 | **YARA** | Optional rule matching (requires `brew install yara` + rules) |
-| **Reputation** | Opt-in SHA-256 lookup against MalwareBazaar API |
+| **Reputation** | Opt-in SHA-256 lookup against MalwareBazaar + VirusTotal APIs |
 
 ## Scoring
 
