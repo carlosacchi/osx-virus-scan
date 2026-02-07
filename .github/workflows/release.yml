@@ -7,25 +7,29 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   release:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build release binary
-        run: swift build -c release
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p artifact
-          cp .build/release/scan artifact/scan
-          chmod +x artifact/scan
-          cd artifact && zip scan-macos.zip scan
+      # Wait for Build workflow to complete and download its artifact
+      - name: Wait and download build artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: build.yml
+          commit: ${{ github.sha }}
+          name: scan-macos
+          path: .
+          check_artifacts: true
+          search_artifacts: true
+          workflow_conclusion: success
+          if_no_artifact_found: fail
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifact/scan-macos.zip
+          files: scan-macos.zip
           generate_release_notes: true
