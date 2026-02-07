@@ -15,6 +15,7 @@ struct AnalyzerRegistry: Sendable {
             MachOAnalyzer(),
             PersistenceAnalyzer(),
             InstallerScriptAnalyzer(),
+            ScriptAnalyzer(),
             // Stage 4: optional external detection engines
             ClamAVAnalyzer(),
             YaraAnalyzer(),

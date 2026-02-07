@@ -147,7 +147,7 @@ Findings are weighted by severity and summed into a 0-100 score:
 ## Example Output
 
 ```
-scan v0.8.0 — Static File Analyzer for macOS
+scan v0.9.0 — Static File Analyzer for macOS
 
 File:       /System/Applications/Calculator.app
 Type:       App Bundle
