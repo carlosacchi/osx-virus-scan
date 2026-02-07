@@ -42,7 +42,7 @@ struct ScoringEngineTests {
     func highFinding() {
         let findings = [makeFinding(severity: .high)]
         let (verdict, score) = engine.evaluate(findings: findings)
-        #expect(verdict == .medium) // 30 <= 30 threshold -> medium
+        #expect(verdict == .high) // Any high finding forces high verdict
         #expect(score == 30)
     }
 

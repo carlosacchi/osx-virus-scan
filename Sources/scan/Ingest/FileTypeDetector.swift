@@ -99,6 +99,26 @@ struct FileTypeDetector: Sendable {
             return .plist
         }
 
+        // DMG/UDIF: "koly" signature at end of file (0x6B6F6C79)
+        // UDIF footer is last 512 bytes, ending with "koly"
+        do {
+            try handle.seekToEnd()
+            let fileSize = try handle.offset()
+
+            if fileSize >= 512 {
+                try handle.seek(toOffset: fileSize - 4)
+                let footerData = try handle.read(upToCount: 4) ?? Data()
+                let footerBytes = [UInt8](footerData)
+
+                if footerBytes.count == 4 && footerBytes[0] == 0x6B && footerBytes[1] == 0x6F
+                    && footerBytes[2] == 0x6C && footerBytes[3] == 0x79 {
+                    return .dmg
+                }
+            }
+        } catch {
+            // Fall through to extension-based detection
+        }
+
         return nil
     }
 

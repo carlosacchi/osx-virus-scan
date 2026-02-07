@@ -114,7 +114,7 @@ Requires `brew install clamav` and/or `brew install yara`.
 | **Entitlements** | Dangerous entitlements (disable-library-validation, get-task-allow, etc.) |
 | **MachO** | Architecture, linked dylibs, non-system library paths |
 | **Persistence** | LaunchAgents/Daemons, login items, shell profile modifications |
-| **InstallerScript** | Suspicious patterns in preinstall/postinstall (curl, chmod 777, eval, base64, etc.) |
+| **Script** | Malicious patterns in scripts (network, privilege escalation, obfuscation, etc.) |
 | **ClamAV** | Optional virus scan via `clamscan` (requires `brew install clamav`) |
 | **YARA** | Optional rule matching (requires `brew install yara` + rules) |
 | **Reputation** | Opt-in SHA-256 lookup against MalwareBazaar API |

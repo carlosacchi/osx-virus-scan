@@ -15,6 +15,12 @@ struct ScoringEngine: Sendable {
         }
         let clampedScore = min(max(rawScore, 0), 100)
 
+        // Force High verdict if ANY finding has High severity
+        // (prevents single High finding from being classified as Medium)
+        if findings.contains(where: { $0.severity == .high }) {
+            return (.high, clampedScore)
+        }
+
         let verdict = config.thresholds
             .first { clampedScore <= $0.maxScore }?
             .verdict ?? .high
