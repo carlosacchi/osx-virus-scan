@@ -232,6 +232,79 @@ All core security features implemented and tested:
 - ✅ **Coverage transparency** - Detailed reporting of analyzers and findings
 - ✅ **Hardened mode** - Preset for maximum security checking
 
+## Roadmap
+
+### Current Status
+
+`scan` is a useful static triage tool, but **not sufficient as a standalone safety gate for torrent apps** or high-risk downloads. It works well as a first-pass analyzer but lacks the depth for high-confidence malware detection in adversarial scenarios.
+
+**Rating:**
+- Engineering quality: 7/10
+- Malware detection sufficiency: 4/10
+
+### Known Limitations & Future Work
+
+Findings are ordered by severity and include source file references for tracking.
+
+#### Critical Priority
+
+1. **No analyzer for standalone scripts** — Malicious shell/Python/Perl scripts outside of PKG installers pass clean.
+   *Affected:* [AnalyzerRegistry.swift:10](Sources/scan/Analyzers/AnalyzerRegistry.swift#L10), [InstallerScriptAnalyzer.swift:47](Sources/scan/Analyzers/InstallerScriptAnalyzer.swift#L47)
+
+2. **Script heuristics restricted to PKG only** — ZIP/DMG payloads containing scripts are not analyzed for malicious patterns.
+   *Affected:* [InstallerScriptAnalyzer.swift:49](Sources/scan/Analyzers/InstallerScriptAnalyzer.swift#L49)
+
+#### High Priority
+
+3. **Incomplete inner executable coverage** — Only first 20 executables in large bundles are checked (`prefix(20)`), allowing malicious binaries to hide.
+   *Affected:* [CodeSignAnalyzer.swift:26](Sources/scan/Analyzers/CodeSignAnalyzer.swift#L26)
+
+4. **Inconsistent deep analysis** — Entitlements and Mach-O checks focus on root files, not all inner executables in extracted archives.
+   *Affected:* [EntitlementsAnalyzer.swift:42](Sources/scan/Analyzers/EntitlementsAnalyzer.swift#L42), [MachOAnalyzer.swift:16](Sources/scan/Analyzers/MachOAnalyzer.swift#L16)
+
+5. **Weak DMG detection** — Relies on `.dmg` extension fallback instead of robust magic byte detection, easily evaded by renaming.
+   *Affected:* [FileTypeDetector.swift:107](Sources/scan/Ingest/FileTypeDetector.swift#L107)
+
+6. **Scoring understates severe indicators** — A single High finding can still result in Medium verdict (score 30).
+   *Affected:* [ScoringConfig.swift:23](Sources/scan/Scoring/ScoringConfig.swift#L23), [ScoringEngineTests.swift:41](Tests/scanTests/Scoring/ScoringEngineTests.swift#L41)
+
+#### Medium Priority
+
+7. **Weak safe defaults** — Offline mode enabled by default, reputation checking requires explicit opt-in.
+   *Affected:* [ScanFileCommand.swift:28](Sources/scan/Commands/ScanFileCommand.swift#L28), [ScanFileCommand.swift:31](Sources/scan/Commands/ScanFileCommand.swift#L31), [ReputationAnalyzer.swift:7](Sources/scan/Analyzers/ReputationAnalyzer.swift#L7)
+
+8. **Narrow YARA baseline** — Only two pinned rules in updater, limiting detection coverage.
+   *Affected:* [UpdateCommand.swift:86](Sources/scan/Commands/UpdateCommand.swift#L86)
+
+9. **Gatekeeper failures downgraded to Info** — `gatekeeper_unavailable` reduces risk signal quality.
+   *Affected:* [GatekeeperAnalyzer.swift:85](Sources/scan/Analyzers/GatekeeperAnalyzer.swift#L85)
+
+#### Low Priority / Maintainability
+
+10. **Pipeline.run complexity** — Centralized orchestration in one long method makes testing and evolution harder.
+    *Affected:* [Pipeline.swift:15](Sources/scan/Core/Pipeline.swift#L15)
+
+11. **VirusTotal expectation drift** — Docs mention VirusTotal support, but runtime only queries MalwareBazaar.
+    *Affected:* [Config.swift:5](Sources/scan/Core/Config.swift#L5), [README.md:132](#L132), [ReputationAnalyzer.swift:17](Sources/scan/Analyzers/ReputationAnalyzer.swift#L17)
+
+12. **Inconsistent versioning** — Version numbers drift across docs, examples, and runtime outputs.
+    *Affected:* [README.md:157](#L157), [ScanResult.swift:8](Sources/scan/Models/ScanResult.swift#L8)
+
+### What's Good
+
+- **Clean domain separation** — Ingest, Unpack, Analyzers, Scoring, Output are well-organized.
+  *See:* [Analyzer.swift:17](Sources/scan/Analyzers/Analyzer.swift#L17)
+
+- **Solid async orchestration** — Analyzer registry uses task groups with deterministic ordering.
+  *See:* [AnalyzerRegistry.swift:42](Sources/scan/Analyzers/AnalyzerRegistry.swift#L42)
+
+- **Security-minded unpacking** — Zip bomb heuristics, escape validation, symlink handling are all present.
+  *See:* [ZIPExtractor.swift](Sources/scan/Unpack/ZIPExtractor.swift)
+
+### Architecture Verdict
+
+The v1.0 architecture is solid for a static scanner, but **threat-model coverage is not yet strong enough for high-stakes malware decisions** (e.g., torrent apps, untrusted downloads). It works well as a triage layer in a defense-in-depth strategy.
+
 ## License
 
 MIT
