@@ -5,7 +5,7 @@ struct ToolInfo: Codable, Sendable {
     let name: String
     let version: String
 
-    static let current = ToolInfo(name: "scan", version: "1.0.1")
+    static let current = ToolInfo(name: "scan", version: "1.0.2")
 }
 
 /// Top-level scan result containing all findings and metadata

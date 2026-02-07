@@ -99,7 +99,6 @@ struct UpdateCommand: AsyncParsableCommand {
 
         // Backdoors
         ("MALW_BackdoorSSH", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_BackdoorSSH.yar", nil),
-        ("MALW_TinyShell_Backdoor", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_TinyShell_Backdoor_gen.yar", nil),
         ("MALW_Jolob_Backdoor", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Jolob_Backdoor.yar", nil),
 
         // APT Groups
