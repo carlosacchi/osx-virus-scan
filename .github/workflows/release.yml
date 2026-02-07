@@ -16,15 +16,43 @@ jobs:
       - uses: actions/checkout@v4
 
       # Wait for Build workflow to complete and download its artifact
-      - name: Wait and download build artifact
+      - name: Wait for Build workflow
+        run: |
+          echo "Waiting for Build workflow to complete for commit ${{ github.sha }}..."
+          max_attempts=40  # 40 * 30s = 20 minutes max wait
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            # Check if Build workflow has completed successfully for this commit
+            status=$(gh run list --workflow=build.yml --commit=${{ github.sha }} --json conclusion --jq '.[0].conclusion' || echo "null")
+
+            if [ "$status" = "success" ]; then
+              echo "Build workflow completed successfully!"
+              break
+            elif [ "$status" = "failure" ] || [ "$status" = "cancelled" ]; then
+              echo "Build workflow failed or was cancelled: $status"
+              exit 1
+            else
+              echo "Build workflow status: $status (attempt $((attempt+1))/$max_attempts)"
+              sleep 30
+              attempt=$((attempt+1))
+            fi
+          done
+
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Timeout waiting for Build workflow"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download build artifact
         uses: dawidd6/action-download-artifact@v6
         with:
           workflow: build.yml
           commit: ${{ github.sha }}
           name: scan-macos
           path: .
-          check_artifacts: true
-          search_artifacts: true
           workflow_conclusion: success
           if_no_artifact_found: fail
 
