@@ -84,26 +84,27 @@ struct UpdateCommand: AsyncParsableCommand {
     /// To update a rule: download the new file, compute its SHA-256, and update the hash here.
     /// Set sha256 to nil to skip verification (allows rule updates without breaking validation).
     private static let yaraRuleSources: [(name: String, url: String, sha256: String?)] = [
-        // Existing rules with pinned hashes
-        ("MALW_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Adwind.yar",
-         "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"),
+        // Eicar test rule with pinned hash
         ("MALW_Eicar", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Eicar.yar",
          "1ba3175cebe28fc5d4d25c1caf604beda152766db268a3f159e4bf61c2eddf54"),
 
-        // macOS-specific malware (nil hashes for flexibility)
-        ("MALW_LoudMiner", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_LoudMiner.yar", nil),
-        ("MALW_EvilQuest", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_OSX_EvilQuest.yar", nil),
-        ("MALW_Shlayer", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_OSX_Shlayer.yar", nil),
-        ("APT_Bundlore", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/APT_OSX_Bundlore.yar", nil),
+        // macOS-specific malware
+        ("MALW_OSX_Leverage", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_OSX_Leverage.yar", nil),
+        ("MALW_Pyinstaller_OSX", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Pyinstaller_OSX.yar", nil),
 
-        // Generic malware patterns
-        ("MALW_Meterpreter", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Meterpreter.yar", nil),
-        ("MALW_CobaltStrike", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_CobaltStrike.yar", nil),
-        ("MALW_Ransomware", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Ransomware.yar", nil),
+        // Generic malware & RATs
+        ("RAT_Adwind", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/RAT_Adwind.yar", nil),
+        ("RAT_Meterpreter", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/RAT_Meterpreter_Reverse_Tcp.yar", nil),
+        ("APT_Cobalt", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/APT_Cobalt.yar", nil),
 
-        // Webshells & backdoors
-        ("WEBSHELL_Generic", "https://raw.githubusercontent.com/Yara-Rules/rules/master/webshells/WEBSHELL_ASPX.yar", nil),
-        ("MALW_Backdoor", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Backdoor.yar", nil),
+        // Backdoors
+        ("MALW_BackdoorSSH", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_BackdoorSSH.yar", nil),
+        ("MALW_TinyShell_Backdoor", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_TinyShell_Backdoor_gen.yar", nil),
+        ("MALW_Jolob_Backdoor", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/MALW_Jolob_Backdoor.yar", nil),
+
+        // APT Groups
+        ("APT_Carbanak", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/APT_Carbanak.yar", nil),
+        ("APT_Careto", "https://raw.githubusercontent.com/Yara-Rules/rules/master/malware/APT_Careto.yar", nil),
     ]
 
     private func updateYARA(shell: ShellRunner, logger: VerboseLogger) async {
