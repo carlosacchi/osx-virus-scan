@@ -211,6 +211,22 @@ Pipeline: ingest -> unpack/mount -> analyze -> score -> output
 
 Built with Swift 6 using `async/await`, Security.framework for code signing, and CryptoKit for hashing. Single external dependency: [swift-argument-parser](https://github.com/apple/swift-argument-parser).
 
+## Roadmap to v1.0.0
+
+### Phase 1 (Core Security)
+- [x] **ScriptAnalyzer** - Comprehensive script malware detection (v0.9.0)
+- [ ] **Recursive executable analysis** - Remove 20-file limit, analyze all executables in containers
+- [ ] **Extend InstallerScriptAnalyzer** - Apply to ZIP/DMG (currently PKG-only)
+- [ ] **Tighten verdict logic** - Force overall High if any finding is High
+- [ ] **Robust file-type detection** - DMG magic bytes (not just extension)
+
+### Phase 2 (Intel & Evasion)
+- [ ] **Improved YARA baseline** - Larger curated rule set with pinned hashes
+- [ ] **Multi-source reputation** - MalwareBazaar + optional VirusTotal
+- [ ] **Anti-evasion test suite** - Scripts in ZIPs, renamed DMGs, >20 executables
+- [ ] **Coverage summary** - Report what was/wasn't analyzed to reduce false confidence
+- [ ] **Hardened mode preset** - `--hardened` flag for safer defaults
+
 ## License
 
 MIT
